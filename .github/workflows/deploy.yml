@@ -16,11 +16,11 @@ jobs:
     - name: Checkout Source Code
       uses: actions/checkout@v4
 
-    # 2. Configura l'SDK di .NET 9
+      # Cambia la riga 22 del file deploy.yml per usare l'SDK allineato
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '9.0.x'
+        dotnet-version: '8.0.x'
 
     # 3. Ripristina i pacchetti NuGet
     - name: Restore Dependencies
