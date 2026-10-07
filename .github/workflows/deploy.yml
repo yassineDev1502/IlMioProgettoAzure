@@ -12,17 +12,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # 1. Scarica il codice sorgente
     - name: Checkout Source Code
       uses: actions/checkout@v4
 
+    # 2. Configura l'SDK di .NET 9
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0.x'
 
+    # 3. Ripristina i pacchetti NuGet
     - name: Restore Dependencies
       run: dotnet restore
 
+    # 4. Compila e pubblica il progetto come "Self-Contained" per Linux x64
     - name: Dotnet Publish (Self-Contained)
       run: |
         dotnet publish IlMioProgetto.Api/IlMioProgetto.Api.csproj \
@@ -31,23 +35,25 @@ jobs:
           --self-contained true \
           -o ./publish
 
+    # 5. Imposta dinamicamente solo il nome dell'App e il suffisso dell'ambiente
     - name: Set Environment Variables based on Branch
       id: set-env
       run: |
         if [ "${{ github.ref_name }}" = "main" ]; then
           echo "APP_NAME=app-myproject-prod-2561" >> $GITHUB_ENV
-          echo "PUBLISH_SECRET=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_PROD }}" >> $GITHUB_ENV
+          echo "ENV_SUFFIX=PROD" >> $GITHUB_ENV
         elif [ "${{ github.ref_name }}" = "test" ]; then
           echo "APP_NAME=app-myproject-test-2561" >> $GITHUB_ENV
-          echo "PUBLISH_SECRET=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_TEST }}" >> $GITHUB_ENV
+          echo "ENV_SUFFIX=TEST" >> $GITHUB_ENV
         else
           echo "APP_NAME=app-myproject-dev-2561" >> $GITHUB_ENV
-          echo "PUBLISH_SECRET=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_DEV }}" >> $GITHUB_ENV
+          echo "ENV_SUFFIX=DEV" >> $GITHUB_ENV
         fi
 
+    # 6. Esegue il deployment richiamando dinamicamente il rispettivo segreto XML globale
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
       with:
         app-name: ${{ env.APP_NAME }}
-        publish-profile: ${{ env.PUBLISH_SECRET }}
+        publish-profile: ${{ secrets[format('AZURE_WEBAPP_PUBLISH_PROFILE_{0}', env.ENV_SUFFIX)] }}
         package: ./publish
