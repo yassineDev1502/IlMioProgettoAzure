@@ -1,0 +1,60 @@
+name: Deploy .NET 9 to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+      - test
+      - dev
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Scarica il codice sorgente dal repository
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+
+    # 2. Configura l'SDK di .NET 9 sulla macchina di build di GitHub
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    # 3. Ripristina i pacchetti NuGet
+    - name: Restore Dependencies
+      run: dotnet restore
+
+    # 4. Compila e pubblica il progetto come "Self-Contained" per Linux x64
+    # Questo include l'intero motore di runtime .NET 9 nel pacchetto isolandolo dal server
+    - name: Dotnet Publish (Self-Contained)
+      run: |
+        dotnet publish IlMioProgetto.Api/IlMioProgetto.Api.csproj \
+          -c Release \
+          -r linux-x64 \
+          --self-contained true \
+          -o ./publish
+
+    # 5. Riconosce il branch attuale e imposta dinamicamente i nomi delle App e dei Segreti
+    - name: Set Environment Variables based on Branch
+      id: set-env
+      run: |
+        if [ "${{ github.ref_name }}" = "main" ]; then
+          echo "APP_NAME=app-myproject-prod-2561" >> $GITHUB_ENV
+          echo "PUBLISH_SECRET=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_PROD }}" >> $GITHUB_ENV
+        elif [ "${{ github.ref_name }}" = "test" ]; then
+          echo "APP_NAME=app-myproject-test-2561" >> $GITHUB_ENV
+          echo "PUBLISH_SECRET=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_TEST }}" >> $GITHUB_ENV
+        else
+          echo "APP_NAME=app-myproject-dev-2561" >> $GITHUB_ENV
+          echo "PUBLISH_SECRET=${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_DEV }}" >> $GITHUB_ENV
+        fi
+
+    # 6. Esegue il deployment fisico dei file estratti sulla Web App corretta su Azure
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.APP_NAME }}
+        publish-profile: ${{ env.PUBLISH_SECRET }}
+        package: ./publish
